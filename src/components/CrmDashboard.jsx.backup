@@ -1,0 +1,601 @@
+import React, { useState, useEffect } from 'react';
+import { Search, MessageCircle, Users, BarChart3, Calendar, TrendingUp, TrendingDown, FileText, LogOut, BellDot, Menu, X, LayoutDashboard, CircleEllipsis, ChevronDown } from 'lucide-react';
+
+
+import DummyProfile from "../assets/images/dummyprofile.jpeg";
+import LeaveRequestPic from "../assets/images/leaverequest.jpeg";
+import Logo from "../assets/images/Group.png";
+import LeadImage from "../assets/images/dp.jpeg";
+
+// Sidebar Component
+const Sidebar = ({ activeMenu, setActiveMenu, isOpen, setIsOpen }) => {
+  const menuItems = [
+    { id: 'dashboard', icon: LayoutDashboard, label: 'Dash board' },
+    { id: 'employees', icon: Users, label: 'Employees' },
+    { id: 'departments', icon: FileText, label: 'Departments' },
+    { id: 'attendance', icon: Calendar, label: 'Attendance' },
+    { id: 'performance', icon: TrendingUp, label: 'Performance' },
+    { id: 'payroll', icon: FileText, label: 'Pay Slip' },
+    { id: 'logout', icon: LogOut, label: 'Logout' }
+  ];
+
+  return (
+    <>
+      {/* Mobile Overlay */}
+      {isOpen && (
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-50 z-40 lg:hidden"
+          onClick={() => setIsOpen(false)}
+        />
+      )}
+      
+      {/* Sidebar */}
+      <div
+        className={`
+          fixed lg:static inset-y-0 left-0 z-50
+          w-64 bg-white border-2 border-[#4C708E] rounded-3xl shadow-lg p-6
+          transform transition-transform duration-300 ease-in-out text-black
+          ${isOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}
+          lg:mr-6 mt-0
+          flex flex-col justify-between
+          h-screen lg:h-full
+        `}
+      >
+        {/* Close button for mobile */}
+        <button
+          className="lg:hidden absolute top-4 right-4 text-gray-600"
+          onClick={() => setIsOpen(false)}
+        >
+          <X size={24} />
+        </button>
+
+        {/* TOP: Menu */}
+        <nav className="space-y-2 mt-8 lg:mt-0">
+          {menuItems.map((item) => {
+            const Icon = item.icon;
+            return (
+              <button
+                key={item.id}
+                onClick={() => {
+                  setActiveMenu(item.id);
+                  setIsOpen(false);
+                }}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${
+                  activeMenu === item.id
+                    ? "bg-[#C4D5E2] text-black"
+                    : "text-gray-600 hover:bg-gray-50"
+                }`}
+              >
+                <Icon size={20} className="text-black" />
+                <span className="font-medium text-black">{item.label}</span>
+              </button>
+            );
+          })}
+        </nav>
+
+        {/* BOTTOM: Profile */}
+        {/* 
+          BACKEND API ROUTE - GET USER PROFILE:
+          Endpoint: GET /api/user/profile
+          Headers: Authorization: Bearer {token}
+          Response: { name: string, role: string, profileImage: string }
+        */}
+        <div className="flex items-center gap-3 pt-4 border-t border-gray-200">
+          <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center overflow-hidden">
+            <img src={LeadImage} alt="Profile" className="w-full h-full object-cover rounded-full"/> 
+            <Users size={20} className="text-gray-600" />
+          </div>
+
+          <div>
+            <p className="text-sm font-semibold text-gray-800">Vignesh</p>
+            <p className="text-xs text-gray-500">Technical</p>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+};
+
+// Stats Card Component
+const StatsCard = ({ title, value, change, icon: Icon }) => {
+  const isPositive = change >= 0;
+  
+  return (
+    <div className="bg-white rounded-2xl p-4 sm:p-6 shadow-sm">
+      <div className="flex items-start justify-between mb-4">
+        <div>
+          <Icon className="text-blue-600" size={20} />
+          <p className="text-gray-500 text-xs sm:text-sm mb-1">{title}</p>
+          <h3 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-800">{value}</h3>
+        </div>
+        {Icon && (
+          <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center flex-shrink-0">
+            <CircleEllipsis size={20} className="text-[#4C6C5A]" />
+          </div>
+        )}
+      </div>
+      <div className="flex items-center gap-1">
+        {isPositive ? (
+          <TrendingUp size={16} className="text-green-600" />
+        ) : (
+          <TrendingDown size={16} className="text-red-600" />
+        )}
+        <span className={`text-xs sm:text-sm font-medium ${isPositive ? 'text-green-600' : 'text-red-600'}`}>
+          {isPositive ? '+' : ''}{change}%
+        </span>
+        <span className="text-gray-400 text-xs">vs last month</span>
+      </div>
+    </div>
+  );
+};
+
+// Main Dashboard Component
+const Dashboard = () => {
+  const [activeMenu, setActiveMenu] = useState('dashboard');
+  const [loading, setLoading] = useState(true);
+  const [dashboardData, setDashboardData] = useState(null);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  useEffect(() => {
+    fetchDashboardData();
+  }, []);
+
+  const fetchDashboardData = async () => {
+    setLoading(true);
+    try {
+      /* 
+        ============================================================
+        BACKEND API ROUTE - GET DASHBOARD DATA:
+        ============================================================
+        Endpoint: GET /api/dashboard/stats
+        Method: GET
+        Headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer {token}'
+        }
+        
+        Expected Response Format from Spring Boot:
+        {
+          totalEmployees: number,
+          totalEmployeesChange: number (percentage, can be negative),
+          presentToday: number,
+          presentTodayChange: number (percentage, can be negative),
+          departments: number,
+          departmentsChange: number (percentage, can be negative),
+          pendingLeaves: number,
+          pendingLeavesChange: number (percentage, can be negative),
+          attendanceData: [
+            { 
+              day: string (Mon, Tue, Wed, Thu, Fri, Sat, Sun), 
+              value: number (0-40 range for attendance count),
+              isHighlighted: boolean (true for current day)
+            }
+          ],
+          employeesByDept: [
+            { 
+              name: string (Department name), 
+              value: number (employee count), 
+              color: string (hex color code like #93C5FD)
+            }
+          ],
+          performanceReviews: [
+            { 
+              name: string (Employee name), 
+              role: string (Job role), 
+              date: string (format: DD-MM-YYYY),
+              profileImage: string (URL or base64)
+            }
+          ],
+          pendingLeaveRequests: [
+            { 
+              name: string (Employee name), 
+              role: string (Job role), 
+              type: string (Leave type like 'Casual Leave'), 
+              date: string (format: DD-MM-HH:MM), 
+              status: string ('Approved' or 'Rejected'),
+              profileImage: string (URL or base64)
+            }
+          ]
+        }
+        
+        Example API Call (Uncomment when backend is ready):
+        const token = localStorage.getItem('authToken');
+        const response = await fetch('http://localhost:7002/api/dashboard/stats', {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          }
+        });
+        
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        setDashboardData(data);
+        ============================================================
+      */
+      
+      // Mock data for demonstration - Remove this when connecting to backend
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      const mockData = {
+        totalEmployees: 1500,
+        totalEmployeesChange: -2,
+        presentToday: 320,
+        presentTodayChange: -1,
+        departments: 150,
+        departmentsChange: -25,
+        pendingLeaves: 150,
+        pendingLeavesChange: -20,
+        attendanceData: [
+          { day: 'Mon', value: 20, isHighlighted: false },
+          { day: 'Tue', value: 25, isHighlighted: false },
+          { day: 'Wed', value: 30, isHighlighted: false },
+          { day: 'Thu', value: 40, isHighlighted: true },
+          { day: 'Fri', value: 22, isHighlighted: false },
+          { day: 'Sat', value: 18, isHighlighted: false },
+          { day: 'Sun', value: 15, isHighlighted: false }
+        ],
+        employeesByDept: [
+          { name: 'Department', value: 914, color: '#93C5FD' },
+          { name: 'Human Resource', value: 311, color: '#A78BFA' },
+          { name: 'Finance', value: 275, color: '#FCA5A5' },
+          { name: 'Product', value: 0, color: '#E5E7EB' }
+        ],
+        performanceReviews: [
+          { name: 'Simon', role: 'Product Team', date: '01-10-2025' },
+          { name: 'Jacob', role: 'Playroll', date: '02-11-2025' },
+          { name: 'Laura', role: 'Asst. Product Manager', date: '05-11-2025' }
+        ],
+        pendingLeaveRequests: [
+          { name: 'Susan', role: 'Technical', type: 'Casual Leave', date: '01-03-11:56', status: 'Approved' },
+          { name: 'Susan', role: 'Technical', type: 'Casual Leave', date: '02-03-70:25', status: 'Approved' },
+          { name: 'Susan', role: 'Technical', type: 'Casual Leave', date: '02-03-70:25', status: 'Approved' },
+          { name: 'Susan', role: 'Technical', type: 'Casual Leave', date: '12-03-70:25', status: 'Rejected' }
+        ]
+      };
+      
+      setDashboardData(mockData);
+    } catch (error) {
+      console.error('Error fetching dashboard data:', error);
+      // Handle error appropriately - show toast/notification
+      // You can set an error state here and display it to the user
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-[#ECF8FF] via-[#BBCEDC] to-[#436988] flex items-center justify-center px-4">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading dashboard...</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-[#ECF8FF] via-[#BBCEDC] to-[#436988]">
+      <div className="px-4 sm:px-6 py-6">
+        <div className="max-w-7xl mx-auto">
+          <div className="flex gap-6">
+            {/* Logo and CRM - Outside sidebar */}
+            <div className="hidden lg:flex flex-col gap-6">
+              <div className="flex items-center gap-3 mb-6">
+                <div className="w-10 h-10 rounded-full flex items-center justify-center">
+                  <img src={Logo} alt="Logo" className="w-10 h-10 object-contain"/> 
+                  <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center">
+                    
+                  </div>
+                </div>
+                <span className="text-2xl font-bold text-gray-800">CRM</span>
+              </div>
+              
+              <Sidebar 
+                activeMenu={activeMenu} 
+                setActiveMenu={setActiveMenu}
+                isOpen={sidebarOpen}
+                setIsOpen={setSidebarOpen}
+              />
+            </div>
+
+            {/* Mobile Sidebar */}
+            <div className="lg:hidden">
+              <Sidebar 
+                activeMenu={activeMenu} 
+                setActiveMenu={setActiveMenu}
+                isOpen={sidebarOpen}
+                setIsOpen={setSidebarOpen}
+              />
+            </div>
+            
+            <div className="flex-1 w-full lg:w-auto">
+              {/* Header with Mobile Logo */}
+              <div className="mb-6">
+                <div className="flex items-center justify-between mb-6 lg:hidden">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full flex items-center justify-center">
+                     <img src={Logo} alt="Logo" className="w-10 h-10 object-contain"/> 
+                    </div>
+                    <span className="text-2xl font-bold text-gray-800">CRM</span>
+                  </div>
+                  <button 
+                    className="text-gray-800"
+                    onClick={() => setSidebarOpen(true)}
+                  >
+                    <Menu size={28} />
+                  </button>
+                </div>
+
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                  <h1 className="text-xl sm:text-2xl font-bold text-gray-800">Hello, Vignesh!</h1>
+                  
+                  <div className="flex items-center gap-2 sm:gap-4 w-full sm:w-auto">
+                    {/* 
+                      BACKEND API ROUTE - SEARCH FUNCTIONALITY:
+                      Endpoint: GET /api/search?query={searchTerm}
+                      Headers: Authorization: Bearer {token}
+                      Response: Array of search results
+                    */}
+                    <div className="relative flex-1 sm:flex-none">
+                      <input
+                        type="text"
+                        placeholder="Search Anything..."
+                        className="h-12 sm:h-[60px] pl-4 sm:pl-6 pr-12 sm:pr-14 rounded-full bg-white text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-200 w-full sm:w-[240px] md:w-[360px] lg:w-[425px]"
+                      />
+                      <button className="absolute right-2 sm:right-3 top-1/2 -translate-y-1/2 w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-gray-900 flex items-center justify-center">
+                        <Search size={16} className="text-white sm:w-[18px] sm:h-[18px]" />
+                      </button>
+                    </div>
+
+                    {/* 
+                      BACKEND API ROUTE - GET NOTIFICATIONS:
+                      Endpoint: GET /api/notifications
+                      Headers: Authorization: Bearer {token}
+                      Response: { notifications: Array, unreadCount: number }
+                    */}
+                    <button className="w-12 h-12 sm:w-[50px] sm:h-[50px] rounded-full bg-white flex items-center justify-center hover:bg-gray-50 transition flex-shrink-0">
+                      <BellDot size={22} className="text-gray-700 sm:w-[25px] sm:h-[25px]" />
+                    </button>
+
+                    {/* 
+                      BACKEND API ROUTE - GET MESSAGES:
+                      Endpoint: GET /api/messages
+                      Headers: Authorization: Bearer {token}
+                      Response: { messages: Array, unreadCount: number }
+                    */}
+                    <button className="w-12 h-12 sm:w-[50px] sm:h-[50px] rounded-full bg-white flex items-center justify-center hover:bg-gray-50 transition flex-shrink-0">
+                      <MessageCircle size={22} className="text-gray-700 sm:w-[25px] sm:h-[25px]" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Stats Grid - Data comes from /api/dashboard/stats */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                <StatsCard
+                  title="Total Employees"
+                  value={dashboardData.totalEmployees}
+                  change={dashboardData.totalEmployeesChange}
+                  icon={Users}
+                />
+                <StatsCard
+                  title="Present Today"
+                  value={dashboardData.presentToday}
+                  change={dashboardData.presentTodayChange}
+                  icon={Calendar}
+                />
+                <StatsCard
+                  title="Departments"
+                  value={dashboardData.departments}
+                  change={dashboardData.departmentsChange}
+                  icon={FileText}
+                />
+                <StatsCard
+                  title="Pending Leaves"
+                  value={dashboardData.pendingLeaves}
+                  change={dashboardData.pendingLeavesChange}
+                  icon={TrendingUp}
+                />
+              </div>
+
+              {/* Charts and Tables Grid */}
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+                {/* Attendance Overview - Data comes from /api/dashboard/stats -> attendanceData */}
+                <div className="bg-white rounded-2xl p-4 sm:p-6 shadow-sm lg:col-span-2">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="font-semibold text-gray-800 text-sm sm:text-base">Attendance Overview</h3>
+                    <div className="flex items-center gap-4">
+                      <div className="relative">
+                        <Calendar size={14} className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-600 pointer-events-none" />
+                        <select className="text-xs sm:text-sm text-gray-600 border border-gray-300 bg-white rounded-lg pl-7 pr-8 py-1 appearance-none cursor-pointer">
+                          <option>Weekday</option>
+                        </select>
+                        <ChevronDown size={14} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-600 pointer-events-none" />
+                      </div>
+                    </div>
+                  </div>
+                  <p className="text-xs text-gray-500 mb-6">Thu, 12 Jul</p>
+                  <div className="relative">
+                    {/* Y-axis labels */}
+                    <div className="absolute left-0 top-0 h-48 sm:h-56 flex flex-col justify-between text-xs text-gray-400 pr-2">
+                      <span>40</span>
+                      <span>30</span>
+                      <span>20</span>
+                      <span>10</span>
+                      <span>0</span>
+                    </div>
+                    {/* Bar chart */}
+                    <div className="ml-8 flex items-end justify-between h-48 sm:h-56 gap-2 sm:gap-4 border-l border-b border-gray-200 pl-4">
+                      {dashboardData.attendanceData.map((item, idx) => (
+                        <div key={idx} className="flex-1 flex flex-col items-center gap-2 h-full group relative">
+                          <div className="w-full flex items-end justify-center flex-1">
+                            <div
+                              className={`w-full rounded-t-lg transition-all cursor-pointer relative ${
+                                item.isHighlighted ? 'bg-[#4C708E]' : 'bg-[#D1E3F5]'
+                              }`}
+                              style={{ height: `${(item.value / 40) * 100}%` }}
+                            >
+                              {/* Hover tooltip */}
+                              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block">
+                                <div className="bg-gray-900 text-white text-xs rounded-lg py-2 px-3 whitespace-nowrap shadow-lg">
+                                  <div className="font-semibold">{item.value} Present</div>
+                                  <div className="text-gray-300">{item.day}, 12 Jul</div>
+                                  {/* Tooltip arrow */}
+                                  <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-1">
+                                    <div className="border-4 border-transparent border-t-gray-900"></div>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                          <span className="text-xs text-gray-500 font-medium mt-2">{item.day}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Employees by Department - Data comes from /api/dashboard/stats -> employeesByDept */}
+                <div className="bg-white rounded-2xl p-4 sm:p-6 shadow-sm lg:col-span-1">
+                  <h3 className="font-semibold text-gray-800 mb-6 text-sm sm:text-base">Employees by Department</h3>
+                  <div className="flex items-center justify-center mb-6">
+                    <div className="relative w-40 h-40 sm:w-48 sm:h-48">
+                      <svg viewBox="0 0 100 100" className="transform -rotate-90">
+                        {dashboardData.employeesByDept.map((dept, idx) => {
+                          const total = dashboardData.employeesByDept.reduce((sum, d) => sum + d.value, 0);
+                          const percentage = (dept.value / total) * 100;
+                          const offset = dashboardData.employeesByDept
+                            .slice(0, idx)
+                            .reduce((sum, d) => sum + (d.value / total) * 100, 0);
+                          
+                          return (
+                            <circle
+                              key={idx}
+                              cx="50"
+                              cy="50"
+                              r="40"
+                              fill="none"
+                              stroke={dept.color}
+                              strokeWidth="20"
+                              strokeDasharray={`${percentage * 2.513} ${251.3 - percentage * 2.513}`}
+                              strokeDashoffset={-offset * 2.513}
+                            />
+                          );
+                        })}
+                      </svg>
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <div className="text-center">
+                          <div className="text-xs text-gray-500 mb-1">4</div>
+                          <div className="text-xs text-gray-500 mt-1">Department</div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="space-y-3">
+                    {dashboardData.employeesByDept.map((dept, idx) => (
+                      <div key={idx} className="flex items-center justify-between text-xs sm:text-sm">
+                        <div className="flex items-center gap-2">
+                          <div className="w-3 h-3 rounded-full" style={{ backgroundColor: dept.color }}></div>
+                          <span className="text-gray-600">{dept.name}</span>
+                        </div>
+                        <span className="font-medium text-gray-800">{dept.value}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Performance Review and Leave Requests */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Performance Review - Data comes from /api/dashboard/stats -> performanceReviews */}
+                <div className="bg-white rounded-2xl p-4 sm:p-6 shadow-sm">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="font-semibold text-gray-800 text-medium sm:text-base">Performance Review</h3>
+                    {/* 
+                      BACKEND API ROUTE - GET ALL PERFORMANCE REVIEWS:
+                      Endpoint: GET /api/performance-reviews
+                      Headers: Authorization: Bearer {token}
+                    */}
+                    <button className="text-xs sm:text-sm text-blue-600">See All</button>
+                  </div>
+                  <div className="space-y-3">
+                    {dashboardData.performanceReviews.map((review, idx) => (
+                      <div key={idx} className="flex items-center justify-between py-2">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-gray-200 flex-shrink-0">
+                          <img src={DummyProfile} alt="Profile" className="w-full h-full object-cover rounded-full"/> 
+                        
+                          </div>
+                          <div>
+                            <p className="font-medium text-gray-800 text-xs sm:text-sm">{review.name}</p>
+                            <p className="text-xs text-gray-500">{review.role}</p>
+                          </div>
+                        </div>
+                        {review.date && (
+                          <span className="text-xs text-gray-500 flex-shrink-0">{review.date}</span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Pending Leave Request - Data comes from /api/dashboard/stats -> pendingLeaveRequests */}
+                <div className="bg-white rounded-2xl p-4 sm:p-6 shadow-sm">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="font-semibold text-gray-800 text-sm sm:text-base">Pending Leave Request</h3>
+                    {/* 
+                      BACKEND API ROUTE - GET ALL LEAVE REQUESTS:
+                      Endpoint: GET /api/leave-requests
+                      Headers: Authorization: Bearer {token}
+                      
+                      BACKEND API ROUTE - APPROVE/REJECT LEAVE:
+                      Endpoint: PUT /api/leave-requests/{id}/status
+                      Method: PUT
+                      Body: { status: 'Approved' | 'Rejected' }
+                      Headers: Authorization: Bearer {token}
+                    */}
+                    <button className="text-xs sm:text-sm text-blue-600">See All</button>
+                  </div>
+                  <div className="space-y-2">
+                    {dashboardData.pendingLeaveRequests.map((request, idx) => (
+                      <div key={idx} className="flex items-center justify-between py-2 border-b border-gray-100 last:border-0 gap-2">
+                        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+                          <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-gray-200 flex-shrink-0">
+                             <img src={LeaveRequestPic} alt="Profile" className="w-full h-full object-cover rounded-full"/> 
+                            
+                          </div>
+                          <div className="min-w-0">
+                            <p className="font-medium text-gray-800 text-xs truncate">{request.name}</p>
+                            <p className="text-xs text-gray-500 truncate">{request.role}</p>
+                          </div>
+                        </div>
+                        <div className="text-right flex-shrink-0">
+                          <p className="text-xs text-gray-600">{request.type}</p>
+                          <p className="text-xs text-gray-400">{request.date}</p>
+                        </div>
+                        <span className={`text-xs px-2 py-1 rounded flex-shrink-0 ${
+                          request.status === 'Approved' 
+                            ? 'bg-green-800 text-white' 
+                            : 'bg-red-800 text-white'
+                        }`}>
+                          {request.status}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default Dashboard;
